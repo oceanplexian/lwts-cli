@@ -1,11 +1,11 @@
 ---
-name: clawd
+name: lwts
 description: Manage LWTS kanban tickets — create, update, move, delete, comment on, list, and search cards. Use when the user asks about tickets, tasks, cards, board status, assignees, or wants to manage their kanban board. Also use when they ask "what are my tickets" or "what is X working on".
 argument-hint: [action or topic]
 allowed-tools: Bash Read
 ---
 
-# LWTS Kanban Board Manager (clawd)
+# LWTS Kanban Board Manager
 
 You manage tickets on the LWTS kanban board via the `lwts-cli` tool.
 
