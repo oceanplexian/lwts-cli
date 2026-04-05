@@ -12,19 +12,34 @@ import (
 	"github.com/oceanplexian/lwts-cli/types"
 )
 
-func CmdMe(cfg client.Config) {
+func printJSON(v interface{}) {
+	out, err := json.MarshalIndent(v, "", "  ")
+	Fatal(err)
+	fmt.Println(string(out))
+}
+
+func CmdMe(cfg client.Config, jsonMode bool) {
 	data, err := cfg.Request("GET", "/api/auth/me", nil)
 	Fatal(err)
 	var u types.User
 	Fatal(json.Unmarshal(data, &u))
+	if jsonMode {
+		printJSON(u)
+		return
+	}
 	fmt.Printf("%s\t%s\t%s\t%s\n", u.ID, u.Name, u.Email, u.Role)
 }
 
-func CmdUsers(cfg client.Config) {
+func CmdUsers(cfg client.Config, jsonMode bool) {
 	data, err := cfg.Request("GET", "/api/v1/users", nil)
 	Fatal(err)
 	var users []types.User
 	Fatal(json.Unmarshal(data, &users))
+
+	if jsonMode {
+		printJSON(users)
+		return
+	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "ID\tNAME\tEMAIL\tROLE")
@@ -34,11 +49,16 @@ func CmdUsers(cfg client.Config) {
 	w.Flush()
 }
 
-func CmdBoards(cfg client.Config) {
+func CmdBoards(cfg client.Config, jsonMode bool) {
 	data, err := cfg.Request("GET", "/api/v1/boards", nil)
 	Fatal(err)
 	var boards []types.Board
 	Fatal(json.Unmarshal(data, &boards))
+
+	if jsonMode {
+		printJSON(boards)
+		return
+	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "ID\tNAME\tKEY")
@@ -48,7 +68,7 @@ func CmdBoards(cfg client.Config) {
 	w.Flush()
 }
 
-func CmdCards(cfg client.Config, args []string) {
+func CmdCards(cfg client.Config, args []string, jsonMode bool) {
 	boardID := ResolveBoardID(cfg, args)
 	data, err := cfg.Request("GET", "/api/v1/boards/"+boardID+"/cards", nil)
 	Fatal(err)
@@ -56,7 +76,15 @@ func CmdCards(cfg client.Config, args []string) {
 	var columns map[string][]types.Card
 	Fatal(json.Unmarshal(data, &columns))
 
-	// Build user lookup
+	if jsonMode {
+		var all []types.Card
+		for _, col := range []string{"backlog", "todo", "in-progress", "done"} {
+			all = append(all, columns[col]...)
+		}
+		printJSON(all)
+		return
+	}
+
 	userMap := GetUserMap(cfg)
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
@@ -80,8 +108,23 @@ func CmdCards(cfg client.Config, args []string) {
 	w.Flush()
 }
 
-func CmdCard(cfg client.Config, keyOrID string) {
+func CmdCard(cfg client.Config, keyOrID string, jsonMode bool) {
 	card := GetCard(cfg, keyOrID)
+
+	if jsonMode {
+		type cardWithComments struct {
+			types.Card
+			Comments []types.Comment `json:"comments,omitempty"`
+		}
+		out := cardWithComments{Card: card}
+		cdata, err := cfg.Request("GET", "/api/v1/cards/"+card.ID+"/comments", nil)
+		if err == nil {
+			_ = json.Unmarshal(cdata, &out.Comments)
+		}
+		printJSON(out)
+		return
+	}
+
 	userMap := GetUserMap(cfg)
 	assignee := ResolveAssignee(card, userMap)
 	reporter := "-"
@@ -115,7 +158,6 @@ func CmdCard(cfg client.Config, keyOrID string) {
 		fmt.Printf("\n--- Description ---\n%s\n", card.Description)
 	}
 
-	// Fetch comments
 	cdata, err := cfg.Request("GET", "/api/v1/cards/"+card.ID+"/comments", nil)
 	if err == nil {
 		var comments []types.Comment
@@ -132,7 +174,7 @@ func CmdCard(cfg client.Config, keyOrID string) {
 	}
 }
 
-func CmdCreate(cfg client.Config, args []string) {
+func CmdCreate(cfg client.Config, args []string, jsonMode bool) {
 	if len(args) < 1 {
 		Fatal(fmt.Errorf("usage: lwts-cli create <title> [--board=ID] [--column=todo] [--tag=blue] [--priority=medium] [--assignee=UUID] [--points=N] [--due=DATE] [--desc=TEXT]"))
 	}
@@ -171,10 +213,14 @@ func CmdCreate(cfg client.Config, args []string) {
 	Fatal(err)
 	var card types.Card
 	Fatal(json.Unmarshal(data, &card))
+	if jsonMode {
+		printJSON(card)
+		return
+	}
 	fmt.Printf("created %s: %s\n", card.Key, card.Title)
 }
 
-func CmdUpdate(cfg client.Config, keyOrID string, args []string) {
+func CmdUpdate(cfg client.Config, keyOrID string, args []string, jsonMode bool) {
 	card := GetCard(cfg, keyOrID)
 	flags := ParseFlags(args)
 
@@ -208,10 +254,14 @@ func CmdUpdate(cfg client.Config, keyOrID string, args []string) {
 
 	_, err := cfg.Request("PUT", "/api/v1/cards/"+card.ID, body)
 	Fatal(err)
+	if jsonMode {
+		printJSON(map[string]string{"status": "updated", "key": card.Key})
+		return
+	}
 	fmt.Printf("updated %s\n", card.Key)
 }
 
-func CmdMove(cfg client.Config, keyOrID string, column string) {
+func CmdMove(cfg client.Config, keyOrID string, column string, jsonMode bool) {
 	card := GetCard(cfg, keyOrID)
 	body := map[string]interface{}{
 		"column_id": column,
@@ -220,30 +270,47 @@ func CmdMove(cfg client.Config, keyOrID string, column string) {
 	}
 	_, err := cfg.Request("POST", "/api/v1/cards/"+card.ID+"/move", body)
 	Fatal(err)
+	if jsonMode {
+		printJSON(map[string]string{"status": "moved", "key": card.Key, "column": column})
+		return
+	}
 	fmt.Printf("moved %s → %s\n", card.Key, column)
 }
 
-func CmdDelete(cfg client.Config, keyOrID string) {
+func CmdDelete(cfg client.Config, keyOrID string, jsonMode bool) {
 	card := GetCard(cfg, keyOrID)
 	_, err := cfg.Request("DELETE", "/api/v1/cards/"+card.ID, nil)
 	Fatal(err)
+	if jsonMode {
+		printJSON(map[string]string{"status": "deleted", "key": card.Key})
+		return
+	}
 	fmt.Printf("deleted %s: %s\n", card.Key, card.Title)
 }
 
-func CmdComment(cfg client.Config, keyOrID string, body string) {
+func CmdComment(cfg client.Config, keyOrID string, body string, jsonMode bool) {
 	card := GetCard(cfg, keyOrID)
 	payload := map[string]string{"body": body}
 	_, err := cfg.Request("POST", "/api/v1/cards/"+card.ID+"/comments", payload)
 	Fatal(err)
+	if jsonMode {
+		printJSON(map[string]string{"status": "commented", "key": card.Key})
+		return
+	}
 	fmt.Printf("commented on %s\n", card.Key)
 }
 
-func CmdComments(cfg client.Config, keyOrID string) {
+func CmdComments(cfg client.Config, keyOrID string, jsonMode bool) {
 	card := GetCard(cfg, keyOrID)
 	data, err := cfg.Request("GET", "/api/v1/cards/"+card.ID+"/comments", nil)
 	Fatal(err)
 	var comments []types.Comment
 	Fatal(json.Unmarshal(data, &comments))
+
+	if jsonMode {
+		printJSON(comments)
+		return
+	}
 
 	userMap := GetUserMap(cfg)
 	for _, cm := range comments {
@@ -258,7 +325,7 @@ func CmdComments(cfg client.Config, keyOrID string) {
 	}
 }
 
-func CmdSearch(cfg client.Config, args []string) {
+func CmdSearch(cfg client.Config, args []string, jsonMode bool) {
 	flags := ParseFlags(args)
 	params := url.Values{}
 	for _, k := range []string{"q", "assignee", "assignee_id", "column_id", "tag", "priority", "board_id", "limit"} {
@@ -281,6 +348,11 @@ func CmdSearch(cfg client.Config, args []string) {
 	Fatal(err)
 	var cards []types.Card
 	Fatal(json.Unmarshal(data, &cards))
+
+	if jsonMode {
+		printJSON(cards)
+		return
+	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "KEY\tPRIORITY\tTITLE\tCOLUMN\tASSIGNEE\tPOINTS")
