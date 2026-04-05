@@ -9,6 +9,8 @@ import (
 	"github.com/oceanplexian/lwts-cli/cmd"
 )
 
+var version = "dev"
+
 func main() {
 	if len(os.Args) < 2 {
 		printUsage()
@@ -17,9 +19,13 @@ func main() {
 
 	command := os.Args[1]
 
-	// setup doesn't need config
-	if command == "setup" {
+	// commands that don't need config
+	switch command {
+	case "setup":
 		cmd.CmdSetup()
+		return
+	case "version":
+		fmt.Println(version)
 		return
 	}
 
@@ -85,6 +91,7 @@ func printUsage() {
 Usage: lwts-cli <command> [args]
 
 Commands:
+  version                        Print version
   setup                          Create config file
   me                             Show current user
   users                          List all users
