@@ -109,6 +109,29 @@ The CLI accepts friendly names and maps them automatically:
 
 **Priority:** critical/urgent/p0 -> highest, high/p1 -> high, medium/p2 -> medium, low/p3 -> low, lowest/p4 -> lowest
 
+## Closing Tickets
+
+When moving a card to `done`, always add a rich summary comment. Gather context from the conversation, git history, and PRs to build the comment. Use markdown formatting — the board renders it.
+
+**Template:**
+
+```
+**Resolved** — <one-line summary of what was done>
+
+**Details:**
+- <bullet points covering what changed, decisions made, anything notable>
+
+**Links:**
+- PR: <GitHub PR URL if one was created, use `gh pr list` or conversation context>
+- Commit: <link to relevant commit(s), e.g. https://github.com/org/repo/commit/SHA>
+- Related: <any other relevant links — docs, issues, Slack threads, wiki pages>
+
+**How it was tested:**
+- <brief description of testing performed>
+```
+
+If no PR or commit exists (e.g. a non-code task), skip those links — don't fabricate them. Use `git log --oneline -5` or `gh pr list --state merged --limit 5` to find recent relevant links when the user doesn't provide them explicitly.
+
 ## Behavior Rules
 
 1. **"my tickets"** — run `lwts-cli me` to get user ID, then `lwts-cli search --assignee_id=<id>`
@@ -116,6 +139,7 @@ The CLI accepts friendly names and maps them automatically:
 3. **Creating cards** — default to column=todo, tag=blue, priority=medium. Ask for title at minimum.
 4. **Ambiguity** — if unclear which card, ask. If obvious from context, proceed.
 5. **Card references** — users may say "KANB-1" or just "1" with context. Use the full key with the CLI.
+6. **Closing cards** — always move to done AND add a rich comment (see "Closing Tickets" above). Never close silently.
 
 ## Example Interactions
 
