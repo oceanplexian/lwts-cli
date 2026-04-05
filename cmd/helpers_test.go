@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"testing"
@@ -31,9 +31,9 @@ func TestMapTag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			got := mapTag(tt.input)
+			got := MapTag(tt.input)
 			if got != tt.want {
-				t.Errorf("mapTag(%q) = %q, want %q", tt.input, got, tt.want)
+				t.Errorf("MapTag(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}
@@ -73,9 +73,9 @@ func TestMapPriority(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			got := mapPriority(tt.input)
+			got := MapPriority(tt.input)
 			if got != tt.want {
-				t.Errorf("mapPriority(%q) = %q, want %q", tt.input, got, tt.want)
+				t.Errorf("MapPriority(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}
@@ -131,15 +131,15 @@ func TestParseFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := parseFlags(tt.args)
+			got := ParseFlags(tt.args)
 			if len(got) != len(tt.want) {
-				t.Errorf("parseFlags(%v) returned %d entries, want %d", tt.args, len(got), len(tt.want))
+				t.Errorf("ParseFlags(%v) returned %d entries, want %d", tt.args, len(got), len(tt.want))
 			}
 			for k, wantV := range tt.want {
 				if gotV, ok := got[k]; !ok {
-					t.Errorf("parseFlags(%v) missing key %q", tt.args, k)
+					t.Errorf("ParseFlags(%v) missing key %q", tt.args, k)
 				} else if gotV != wantV {
-					t.Errorf("parseFlags(%v)[%q] = %q, want %q", tt.args, k, gotV, wantV)
+					t.Errorf("ParseFlags(%v)[%q] = %q, want %q", tt.args, k, gotV, wantV)
 				}
 			}
 		})
@@ -186,9 +186,9 @@ func TestFlagOr(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := flagOr(tt.flags, tt.key, tt.def)
+			got := FlagOr(tt.flags, tt.key, tt.def)
 			if got != tt.want {
-				t.Errorf("flagOr(%v, %q, %q) = %q, want %q", tt.flags, tt.key, tt.def, got, tt.want)
+				t.Errorf("FlagOr(%v, %q, %q) = %q, want %q", tt.flags, tt.key, tt.def, got, tt.want)
 			}
 		})
 	}
@@ -235,9 +235,9 @@ func TestTruncate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := truncate(tt.s, tt.max)
+			got := Truncate(tt.s, tt.max)
 			if got != tt.want {
-				t.Errorf("truncate(%q, %d) = %q, want %q", tt.s, tt.max, got, tt.want)
+				t.Errorf("Truncate(%q, %d) = %q, want %q", tt.s, tt.max, got, tt.want)
 			}
 		})
 	}
