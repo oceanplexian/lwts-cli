@@ -150,7 +150,12 @@ func CmdCard(cfg client.Config, keyOrID string, jsonMode bool) {
 	fmt.Printf("Assignee:  %s\n", assignee)
 	fmt.Printf("Reporter:  %s\n", reporter)
 	fmt.Printf("Points:    %s\n", pts)
+	epic := "-"
+	if card.EpicID != nil && *card.EpicID != "" {
+		epic = *card.EpicID
+	}
 	fmt.Printf("Due:       %s\n", due)
+	fmt.Printf("Epic:      %s\n", epic)
 	fmt.Printf("Version:   %d\n", card.Version)
 	fmt.Printf("ID:        %s\n", card.ID)
 
@@ -176,7 +181,7 @@ func CmdCard(cfg client.Config, keyOrID string, jsonMode bool) {
 
 func CmdCreate(cfg client.Config, args []string, jsonMode bool) {
 	if len(args) < 1 {
-		Fatal(fmt.Errorf("usage: lwts-cli create <title> [--board=ID] [--column=todo] [--tag=blue] [--priority=medium] [--assignee=UUID] [--points=N] [--due=DATE] [--desc=TEXT]"))
+		Fatal(fmt.Errorf("usage: lwts-cli create <title> [--board=ID] [--column=todo] [--tag=blue] [--priority=medium] [--assignee=UUID] [--points=N] [--due=DATE] [--desc=TEXT] [--epic=UUID]"))
 	}
 
 	title := args[0]
@@ -207,6 +212,9 @@ func CmdCreate(cfg client.Config, args []string, jsonMode bool) {
 	}
 	if v := flags["desc"]; v != "" {
 		body["description"] = v
+	}
+	if v := flags["epic"]; v != "" {
+		body["epic_id"] = v
 	}
 
 	data, err := cfg.Request("POST", "/api/v1/boards/"+boardID+"/cards", body)
@@ -250,6 +258,9 @@ func CmdUpdate(cfg client.Config, keyOrID string, args []string, jsonMode bool) 
 	}
 	if v := flags["due"]; v != "" {
 		body["due_date"] = v
+	}
+	if v := flags["epic"]; v != "" {
+		body["epic_id"] = v
 	}
 
 	_, err := cfg.Request("PUT", "/api/v1/cards/"+card.ID, body)

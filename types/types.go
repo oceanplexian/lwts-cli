@@ -29,6 +29,7 @@ type Card struct {
 	ReporterID   *string `json:"reporter_id"`
 	Points       *int    `json:"points"`
 	DueDate      *string `json:"due_date"`
+	EpicID       *string `json:"epic_id"`
 	Version      int     `json:"version"`
 	Position     int     `json:"position"`
 	CreatedAt    string  `json:"created_at"`
