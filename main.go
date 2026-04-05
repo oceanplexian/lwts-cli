@@ -12,6 +12,18 @@ import (
 var version = "dev"
 
 func main() {
+	// Detect and strip --json flag from args
+	var jsonMode bool
+	var filtered []string
+	for _, arg := range os.Args[1:] {
+		if arg == "--json" {
+			jsonMode = true
+		} else {
+			filtered = append(filtered, arg)
+		}
+	}
+	os.Args = append([]string{os.Args[0]}, filtered...)
+
 	if len(os.Args) < 2 {
 		printUsage()
 		os.Exit(1)
@@ -37,47 +49,47 @@ func main() {
 
 	switch command {
 	case "me":
-		cmd.CmdMe(cfg)
+		cmd.CmdMe(cfg, jsonMode)
 	case "users":
-		cmd.CmdUsers(cfg)
+		cmd.CmdUsers(cfg, jsonMode)
 	case "boards":
-		cmd.CmdBoards(cfg)
+		cmd.CmdBoards(cfg, jsonMode)
 	case "cards":
-		cmd.CmdCards(cfg, os.Args[2:])
+		cmd.CmdCards(cfg, os.Args[2:], jsonMode)
 	case "card":
 		if len(os.Args) < 3 {
 			cmd.Fatal(fmt.Errorf("usage: lwts-cli card <key>"))
 		}
-		cmd.CmdCard(cfg, os.Args[2])
+		cmd.CmdCard(cfg, os.Args[2], jsonMode)
 	case "create":
-		cmd.CmdCreate(cfg, os.Args[2:])
+		cmd.CmdCreate(cfg, os.Args[2:], jsonMode)
 	case "update":
 		if len(os.Args) < 3 {
 			cmd.Fatal(fmt.Errorf("usage: lwts-cli update <key> --field=value ..."))
 		}
-		cmd.CmdUpdate(cfg, os.Args[2], os.Args[3:])
+		cmd.CmdUpdate(cfg, os.Args[2], os.Args[3:], jsonMode)
 	case "move":
 		if len(os.Args) < 4 {
 			cmd.Fatal(fmt.Errorf("usage: lwts-cli move <key> <column>"))
 		}
-		cmd.CmdMove(cfg, os.Args[2], os.Args[3])
+		cmd.CmdMove(cfg, os.Args[2], os.Args[3], jsonMode)
 	case "delete":
 		if len(os.Args) < 3 {
 			cmd.Fatal(fmt.Errorf("usage: lwts-cli delete <key>"))
 		}
-		cmd.CmdDelete(cfg, os.Args[2])
+		cmd.CmdDelete(cfg, os.Args[2], jsonMode)
 	case "comment":
 		if len(os.Args) < 4 {
 			cmd.Fatal(fmt.Errorf("usage: lwts-cli comment <key> <body>"))
 		}
-		cmd.CmdComment(cfg, os.Args[2], strings.Join(os.Args[3:], " "))
+		cmd.CmdComment(cfg, os.Args[2], strings.Join(os.Args[3:], " "), jsonMode)
 	case "comments":
 		if len(os.Args) < 3 {
 			cmd.Fatal(fmt.Errorf("usage: lwts-cli comments <key>"))
 		}
-		cmd.CmdComments(cfg, os.Args[2])
+		cmd.CmdComments(cfg, os.Args[2], jsonMode)
 	case "search":
-		cmd.CmdSearch(cfg, os.Args[2:])
+		cmd.CmdSearch(cfg, os.Args[2:], jsonMode)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", command)
 		printUsage()
