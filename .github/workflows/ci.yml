@@ -27,5 +27,5 @@ jobs:
       - name: Lint
         if: hashFiles('.golangci.yml') != ''
         run: |
-          go install github.com/golangci-lint/golangci-lint/cmd/golangci-lint@latest
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
           golangci-lint run ./...
