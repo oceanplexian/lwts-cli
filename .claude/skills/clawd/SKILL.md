@@ -136,7 +136,7 @@ If no PR or commit exists (e.g. a non-code task), skip those links — don't fab
 
 1. **"my tickets"** — run `lwts-cli me` to get user ID, then `lwts-cli search --assignee_id=<id>`
 2. **"what's X working on"** — `lwts-cli search --assignee=<name>`
-3. **Creating cards** — default to column=todo, tag=blue, priority=medium. Ask for title at minimum.
+3. **Creating cards** — default to column=todo, tag=blue, priority=medium. Ask for title at minimum. If the card relates to code or a repo, include `**Repo:** <github URL>` as the first line of the description.
 4. **Ambiguity** — if unclear which card, ask. If obvious from context, proceed.
 5. **Card references** — users may say "KANB-1" or just "1" with context. Use the full key with the CLI.
 6. **Closing cards** — always move to done AND add a rich comment (see "Closing Tickets" above). Never close silently.
