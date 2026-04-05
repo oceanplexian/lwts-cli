@@ -130,6 +130,7 @@ Create/Update flags:
   --points=N        Story points
   --due=DATE        Due date (YYYY-MM-DD)
   --desc=TEXT        Description (markdown)
+  --epic=UUID       Epic card ID
   --title=TEXT      New title (update only)
 
 Search flags:
