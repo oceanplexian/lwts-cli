@@ -128,21 +128,38 @@ type Comment struct {
 	CreatedAt string `json:"created_at"`
 }
 
+// ── JSON helpers ───────────────────────────────────────────────────────────
+
+func printJSON(v interface{}) {
+	out, err := json.MarshalIndent(v, "", "  ")
+	fatal(err)
+	fmt.Println(string(out))
+}
+
 // ── Commands ────────────────────────────────────────────────────────────────
 
-func cmdMe(cfg Config) {
+func cmdMe(cfg Config, jsonMode bool) {
 	data, err := cfg.request("GET", "/api/auth/me", nil)
 	fatal(err)
 	var u User
 	fatal(json.Unmarshal(data, &u))
+	if jsonMode {
+		printJSON(u)
+		return
+	}
 	fmt.Printf("%s\t%s\t%s\t%s\n", u.ID, u.Name, u.Email, u.Role)
 }
 
-func cmdUsers(cfg Config) {
+func cmdUsers(cfg Config, jsonMode bool) {
 	data, err := cfg.request("GET", "/api/v1/users", nil)
 	fatal(err)
 	var users []User
 	fatal(json.Unmarshal(data, &users))
+
+	if jsonMode {
+		printJSON(users)
+		return
+	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "ID\tNAME\tEMAIL\tROLE")
@@ -152,11 +169,16 @@ func cmdUsers(cfg Config) {
 	w.Flush()
 }
 
-func cmdBoards(cfg Config) {
+func cmdBoards(cfg Config, jsonMode bool) {
 	data, err := cfg.request("GET", "/api/v1/boards", nil)
 	fatal(err)
 	var boards []Board
 	fatal(json.Unmarshal(data, &boards))
+
+	if jsonMode {
+		printJSON(boards)
+		return
+	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "ID\tNAME\tKEY")
@@ -166,13 +188,30 @@ func cmdBoards(cfg Config) {
 	w.Flush()
 }
 
-func cmdCards(cfg Config, args []string) {
+func cmdCards(cfg Config, args []string, jsonMode bool) {
 	boardID := resolveBoardID(cfg, args)
 	data, err := cfg.request("GET", "/api/v1/boards/"+boardID+"/cards", nil)
 	fatal(err)
 
 	var columns map[string][]Card
 	fatal(json.Unmarshal(data, &columns))
+
+	if jsonMode {
+		// Flatten to a single array with column info preserved in ColumnID
+		var all []Card
+		for _, col := range []string{"backlog", "todo", "in-progress", "done"} {
+			cards, ok := columns[col]
+			if !ok {
+				continue
+			}
+			for i := range cards {
+				cards[i].ColumnID = col
+			}
+			all = append(all, cards...)
+		}
+		printJSON(all)
+		return
+	}
 
 	// Build user lookup
 	userMap := getUserMap(cfg)
@@ -198,8 +237,27 @@ func cmdCards(cfg Config, args []string) {
 	w.Flush()
 }
 
-func cmdCard(cfg Config, keyOrID string) {
+func cmdCard(cfg Config, keyOrID string, jsonMode bool) {
 	card := getCard(cfg, keyOrID)
+
+	if jsonMode {
+		// Include comments in JSON output
+		type CardWithComments struct {
+			Card
+			Comments []Comment `json:"comments"`
+		}
+		out := CardWithComments{Card: card}
+		cdata, err := cfg.request("GET", "/api/v1/cards/"+card.ID+"/comments", nil)
+		if err == nil {
+			json.Unmarshal(cdata, &out.Comments)
+		}
+		if out.Comments == nil {
+			out.Comments = []Comment{}
+		}
+		printJSON(out)
+		return
+	}
+
 	userMap := getUserMap(cfg)
 	assignee := resolveAssignee(card, userMap)
 	reporter := "-"
@@ -250,7 +308,7 @@ func cmdCard(cfg Config, keyOrID string) {
 	}
 }
 
-func cmdCreate(cfg Config, args []string) {
+func cmdCreate(cfg Config, args []string, jsonMode bool) {
 	if len(args) < 1 {
 		fatal(fmt.Errorf("usage: lwts-cli create <title> [--board=ID] [--column=todo] [--tag=blue] [--priority=medium] [--assignee=UUID] [--points=N] [--due=DATE] [--desc=TEXT]"))
 	}
@@ -288,10 +346,14 @@ func cmdCreate(cfg Config, args []string) {
 	fatal(err)
 	var card Card
 	fatal(json.Unmarshal(data, &card))
+	if jsonMode {
+		printJSON(card)
+		return
+	}
 	fmt.Printf("created %s: %s\n", card.Key, card.Title)
 }
 
-func cmdUpdate(cfg Config, keyOrID string, args []string) {
+func cmdUpdate(cfg Config, keyOrID string, args []string, jsonMode bool) {
 	card := getCard(cfg, keyOrID)
 	flags := parseFlags(args)
 
@@ -324,10 +386,14 @@ func cmdUpdate(cfg Config, keyOrID string, args []string) {
 
 	_, err := cfg.request("PUT", "/api/v1/cards/"+card.ID, body)
 	fatal(err)
+	if jsonMode {
+		printJSON(map[string]string{"status": "updated", "key": card.Key})
+		return
+	}
 	fmt.Printf("updated %s\n", card.Key)
 }
 
-func cmdMove(cfg Config, keyOrID string, column string) {
+func cmdMove(cfg Config, keyOrID string, column string, jsonMode bool) {
 	card := getCard(cfg, keyOrID)
 	body := map[string]interface{}{
 		"column_id": column,
@@ -336,30 +402,47 @@ func cmdMove(cfg Config, keyOrID string, column string) {
 	}
 	_, err := cfg.request("POST", "/api/v1/cards/"+card.ID+"/move", body)
 	fatal(err)
+	if jsonMode {
+		printJSON(map[string]string{"status": "moved", "key": card.Key, "column": column})
+		return
+	}
 	fmt.Printf("moved %s → %s\n", card.Key, column)
 }
 
-func cmdDelete(cfg Config, keyOrID string) {
+func cmdDelete(cfg Config, keyOrID string, jsonMode bool) {
 	card := getCard(cfg, keyOrID)
 	_, err := cfg.request("DELETE", "/api/v1/cards/"+card.ID, nil)
 	fatal(err)
+	if jsonMode {
+		printJSON(map[string]string{"status": "deleted", "key": card.Key, "title": card.Title})
+		return
+	}
 	fmt.Printf("deleted %s: %s\n", card.Key, card.Title)
 }
 
-func cmdComment(cfg Config, keyOrID string, body string) {
+func cmdComment(cfg Config, keyOrID string, body string, jsonMode bool) {
 	card := getCard(cfg, keyOrID)
 	payload := map[string]string{"body": body}
 	_, err := cfg.request("POST", "/api/v1/cards/"+card.ID+"/comments", payload)
 	fatal(err)
+	if jsonMode {
+		printJSON(map[string]string{"status": "commented", "key": card.Key})
+		return
+	}
 	fmt.Printf("commented on %s\n", card.Key)
 }
 
-func cmdComments(cfg Config, keyOrID string) {
+func cmdComments(cfg Config, keyOrID string, jsonMode bool) {
 	card := getCard(cfg, keyOrID)
 	data, err := cfg.request("GET", "/api/v1/cards/"+card.ID+"/comments", nil)
 	fatal(err)
 	var comments []Comment
 	fatal(json.Unmarshal(data, &comments))
+
+	if jsonMode {
+		printJSON(comments)
+		return
+	}
 
 	userMap := getUserMap(cfg)
 	for _, cm := range comments {
@@ -374,7 +457,7 @@ func cmdComments(cfg Config, keyOrID string) {
 	}
 }
 
-func cmdSearch(cfg Config, args []string) {
+func cmdSearch(cfg Config, args []string, jsonMode bool) {
 	flags := parseFlags(args)
 	params := url.Values{}
 	for _, k := range []string{"q", "assignee", "assignee_id", "column_id", "tag", "priority", "board_id", "limit"} {
@@ -397,6 +480,11 @@ func cmdSearch(cfg Config, args []string) {
 	fatal(err)
 	var cards []Card
 	fatal(json.Unmarshal(data, &cards))
+
+	if jsonMode {
+		printJSON(cards)
+		return
+	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "KEY\tPRIORITY\tTITLE\tCOLUMN\tASSIGNEE\tPOINTS")
@@ -601,6 +689,18 @@ func fatal(err error) {
 // ── Main ────────────────────────────────────────────────────────────────────
 
 func main() {
+	// Check for --json flag and strip it from args
+	var jsonMode bool
+	var filtered []string
+	for _, arg := range os.Args {
+		if arg == "--json" {
+			jsonMode = true
+		} else {
+			filtered = append(filtered, arg)
+		}
+	}
+	os.Args = filtered
+
 	if len(os.Args) < 2 {
 		printUsage()
 		os.Exit(1)
@@ -622,47 +722,47 @@ func main() {
 
 	switch cmd {
 	case "me":
-		cmdMe(cfg)
+		cmdMe(cfg, jsonMode)
 	case "users":
-		cmdUsers(cfg)
+		cmdUsers(cfg, jsonMode)
 	case "boards":
-		cmdBoards(cfg)
+		cmdBoards(cfg, jsonMode)
 	case "cards":
-		cmdCards(cfg, os.Args[2:])
+		cmdCards(cfg, os.Args[2:], jsonMode)
 	case "card":
 		if len(os.Args) < 3 {
 			fatal(fmt.Errorf("usage: lwts-cli card <key>"))
 		}
-		cmdCard(cfg, os.Args[2])
+		cmdCard(cfg, os.Args[2], jsonMode)
 	case "create":
-		cmdCreate(cfg, os.Args[2:])
+		cmdCreate(cfg, os.Args[2:], jsonMode)
 	case "update":
 		if len(os.Args) < 3 {
 			fatal(fmt.Errorf("usage: lwts-cli update <key> --field=value ..."))
 		}
-		cmdUpdate(cfg, os.Args[2], os.Args[3:])
+		cmdUpdate(cfg, os.Args[2], os.Args[3:], jsonMode)
 	case "move":
 		if len(os.Args) < 4 {
 			fatal(fmt.Errorf("usage: lwts-cli move <key> <column>"))
 		}
-		cmdMove(cfg, os.Args[2], os.Args[3])
+		cmdMove(cfg, os.Args[2], os.Args[3], jsonMode)
 	case "delete":
 		if len(os.Args) < 3 {
 			fatal(fmt.Errorf("usage: lwts-cli delete <key>"))
 		}
-		cmdDelete(cfg, os.Args[2])
+		cmdDelete(cfg, os.Args[2], jsonMode)
 	case "comment":
 		if len(os.Args) < 4 {
 			fatal(fmt.Errorf("usage: lwts-cli comment <key> <body>"))
 		}
-		cmdComment(cfg, os.Args[2], strings.Join(os.Args[3:], " "))
+		cmdComment(cfg, os.Args[2], strings.Join(os.Args[3:], " "), jsonMode)
 	case "comments":
 		if len(os.Args) < 3 {
 			fatal(fmt.Errorf("usage: lwts-cli comments <key>"))
 		}
-		cmdComments(cfg, os.Args[2])
+		cmdComments(cfg, os.Args[2], jsonMode)
 	case "search":
-		cmdSearch(cfg, os.Args[2:])
+		cmdSearch(cfg, os.Args[2:], jsonMode)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", cmd)
 		printUsage()
@@ -673,7 +773,10 @@ func main() {
 func printUsage() {
 	fmt.Fprintf(os.Stderr, `lwts-cli — LWTS kanban board CLI
 
-Usage: lwts-cli <command> [args]
+Usage: lwts-cli <command> [args] [--json]
+
+Global flags:
+  --json              Output JSON instead of human-readable text
 
 Commands:
   setup                          Create config file
