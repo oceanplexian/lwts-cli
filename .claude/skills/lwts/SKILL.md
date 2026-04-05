@@ -132,6 +132,16 @@ When moving a card to `done`, always add a rich summary comment. Gather context 
 
 If no PR or commit exists (e.g. a non-code task), skip those links — don't fabricate them. Use `git log --oneline -5` or `gh pr list --state merged --limit 5` to find recent relevant links when the user doesn't provide them explicitly.
 
+## Agent Coordination — CRITICAL
+
+When working on tickets (especially in parallel with other agents), you MUST update ticket status to prevent conflicts:
+
+1. **Starting work** — As soon as you begin actively working on a ticket, immediately move it to `in-progress` (`lwts-cli move <KEY> in-progress`). This signals to other agents that the ticket is claimed. Do this BEFORE writing any code.
+2. **Completing work** — As soon as you finish, move the ticket to `done` and add the closing comment. Don't batch these — close each ticket the moment it's done.
+3. **Not immediately working** — If you're just planning, discussing, or creating tickets for later, leave them in `todo`. Only move to `in-progress` when you actually start.
+
+This prevents multiple agents from grabbing the same ticket and doing duplicate work.
+
 ## Behavior Rules
 
 1. **"my tickets"** — run `lwts-cli me` to get user ID, then `lwts-cli search --assignee_id=<id>`
