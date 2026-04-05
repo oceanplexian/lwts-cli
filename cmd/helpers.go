@@ -32,14 +32,18 @@ func GetCard(cfg client.Config, keyOrID string) types.Card {
 		bdata, err := cfg.Request("GET", "/api/v1/boards", nil)
 		if err == nil {
 			var boards []types.Board
-			json.Unmarshal(bdata, &boards)
+			if err := json.Unmarshal(bdata, &boards); err != nil {
+				return types.Card{}
+			}
 			for _, b := range boards {
 				cdata, err := cfg.Request("GET", "/api/v1/boards/"+b.ID+"/cards", nil)
 				if err != nil {
 					continue
 				}
 				var columns map[string][]types.Card
-				json.Unmarshal(cdata, &columns)
+				if err := json.Unmarshal(cdata, &columns); err != nil {
+					continue
+				}
 				for _, cards := range columns {
 					for _, c := range cards {
 						if strings.EqualFold(c.Key, keyOrID) {

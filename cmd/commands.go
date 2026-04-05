@@ -156,8 +156,9 @@ func CmdCreate(cfg client.Config, args []string) {
 	}
 	if v := flags["points"]; v != "" {
 		var pts int
-		fmt.Sscanf(v, "%d", &pts)
-		body["points"] = pts
+		if _, err := fmt.Sscanf(v, "%d", &pts); err == nil {
+			body["points"] = pts
+		}
 	}
 	if v := flags["due"]; v != "" {
 		body["due_date"] = v
@@ -197,8 +198,9 @@ func CmdUpdate(cfg client.Config, keyOrID string, args []string) {
 	}
 	if v := flags["points"]; v != "" {
 		var pts int
-		fmt.Sscanf(v, "%d", &pts)
-		body["points"] = pts
+		if _, err := fmt.Sscanf(v, "%d", &pts); err == nil {
+			body["points"] = pts
+		}
 	}
 	if v := flags["due"]; v != "" {
 		body["due_date"] = v
