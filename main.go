@@ -123,7 +123,7 @@ Global flags:
 
 Create/Update flags:
   --board=ID        Board ID
-  --column=COL      Column (backlog, todo, in-progress, done)
+  --column=COL      Column (backlog, todo, in-progress, done, cleared)
   --tag=TAG         Tag (blue/feature, green/fix, orange/infra, red/bug)
   --priority=PRI    Priority (highest/critical, high, medium, low, lowest)
   --assignee=UUID   Assignee user ID
