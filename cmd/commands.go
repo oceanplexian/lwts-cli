@@ -68,6 +68,11 @@ func CmdBoards(cfg client.Config, jsonMode bool) {
 	w.Flush()
 }
 
+// ColumnOrder is the canonical display order for board columns.
+// "cleared" is the archive state used by the web UI's "Clear done" button —
+// cards there are not shown on the kanban board but are still queryable.
+var ColumnOrder = []string{"backlog", "todo", "in-progress", "done", "cleared"}
+
 func CmdCards(cfg client.Config, args []string, jsonMode bool) {
 	boardID := ResolveBoardID(cfg, args)
 	data, err := cfg.Request("GET", "/api/v1/boards/"+boardID+"/cards", nil)
@@ -78,7 +83,7 @@ func CmdCards(cfg client.Config, args []string, jsonMode bool) {
 
 	if jsonMode {
 		var all []types.Card
-		for _, col := range []string{"backlog", "todo", "in-progress", "done"} {
+		for _, col := range ColumnOrder {
 			all = append(all, columns[col]...)
 		}
 		printJSON(all)
@@ -90,7 +95,7 @@ func CmdCards(cfg client.Config, args []string, jsonMode bool) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "KEY\tPRIORITY\tTITLE\tCOLUMN\tASSIGNEE\tPOINTS")
 
-	for _, col := range []string{"backlog", "todo", "in-progress", "done"} {
+	for _, col := range ColumnOrder {
 		cards, ok := columns[col]
 		if !ok {
 			continue

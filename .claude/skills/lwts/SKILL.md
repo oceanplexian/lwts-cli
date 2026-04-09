@@ -69,7 +69,7 @@ The CLI automatically fetches the current version to avoid conflicts.
 ### Move
 
 ```bash
-lwts-cli move <KEY> <column>   # Columns: backlog, todo, in-progress, done
+lwts-cli move <KEY> <column>   # Columns: backlog, todo, in-progress, done, cleared
 ```
 
 ### Delete
@@ -95,7 +95,7 @@ Flags (at least one required):
 - `--q=TEXT` — search title/description
 - `--assignee=NAME` ��� fuzzy match user name
 - `--assignee_id=UUID` — exact user ID
-- `--column_id=COL` — filter by column
+- `--column_id=COL` — filter by column (backlog, todo, in-progress, done, cleared)
 - `--tag=TAG` — filter by tag
 - `--priority=PRI` ��� filter by priority
 - `--board_id=ID` — filter by board
