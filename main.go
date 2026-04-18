@@ -134,14 +134,20 @@ Create/Update flags:
   --title=TEXT      New title (update only)
 
 Search flags:
-  --q=TEXT          Search title/description
+  --q=TEXT          Search title/description (semantic if workspace enabled)
   --assignee=NAME   Fuzzy match user name
   --assignee_id=ID  Exact user ID
   --column_id=COL   Filter by column
   --tag=TAG         Filter by tag
   --priority=PRI    Filter by priority
   --board_id=ID     Filter by board
-  --limit=N         Max results (default 50)
+  --limit=N         Max results (default 5)
+  --min-score=N     Min confidence 0..1 (default 0.5)
+  --include-done=true  Include done/cleared columns (default false)
+
+Each result prints an indented snippet explaining why it matched, plus a
+confidence tier (HIGH/MED/LOW) and match kind (title/sem/lex). Use --json
+to get a structured {results, total_matches, query_mode} envelope.
 
 Config: ~/.config/lwts/config.yaml
 `)

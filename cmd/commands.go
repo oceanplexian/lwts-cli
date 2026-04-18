@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"text/tabwriter"
 
 	"github.com/oceanplexian/lwts-cli/client"
@@ -341,10 +342,18 @@ func CmdComments(cfg client.Config, keyOrID string, jsonMode bool) {
 	}
 }
 
+// CmdSearch queries /api/v1/search with agent-friendly defaults:
+//   - limit 5 (not 50): agents rarely need more, reduces token burn
+//   - min_score 0.5: drop weak semantic neighbors unless caller asks for them
+//   - include_done false: only active work by default
+//
+// All three can be overridden via flags. Text output is one line per result
+// plus an indented snippet; --json emits a stable {results, total_matches,
+// query_mode} envelope for programmatic callers.
 func CmdSearch(cfg client.Config, args []string, jsonMode bool) {
 	flags := ParseFlags(args)
 	params := url.Values{}
-	for _, k := range []string{"q", "assignee", "assignee_id", "column_id", "tag", "priority", "board_id", "limit"} {
+	for _, k := range []string{"q", "assignee", "assignee_id", "column_id", "tag", "priority", "board_id"} {
 		if v := flags[k]; v != "" {
 			if k == "tag" {
 				v = MapTag(v)
@@ -356,39 +365,133 @@ func CmdSearch(cfg client.Config, args []string, jsonMode bool) {
 		}
 	}
 
-	if len(params) == 0 {
+	// Agent-tuned defaults. The web UI uses the API's own defaults (limit 50,
+	// include_done true, no min_score) and isn't affected.
+	limit := "5"
+	if v := flags["limit"]; v != "" {
+		limit = v
+	}
+	params.Set("limit", limit)
+
+	if v := flags["min_score"]; v != "" {
+		params.Set("min_score", v)
+	} else if flags["min-score"] != "" {
+		params.Set("min_score", flags["min-score"])
+	} else {
+		params.Set("min_score", "0.5")
+	}
+
+	// include_done false unless --include-done or --include_done flag is set.
+	includeDone := flags["include_done"] == "true" || flags["include-done"] == "true"
+	if !includeDone {
+		params.Set("include_done", "false")
+	}
+
+	if params.Get("q") == "" && params.Get("assignee") == "" && params.Get("assignee_id") == "" &&
+		params.Get("column_id") == "" && params.Get("tag") == "" && params.Get("priority") == "" &&
+		params.Get("board_id") == "" {
 		Fatal(fmt.Errorf("search requires at least one filter: --q, --assignee, --column_id, --tag, --priority, --board_id"))
 	}
 
-	data, err := cfg.Request("GET", "/api/v1/search?"+params.Encode(), nil)
+	data, hdrs, err := cfg.RequestWithHeaders("GET", "/api/v1/search?"+params.Encode(), nil)
 	Fatal(err)
 	var cards []types.Card
 	Fatal(json.Unmarshal(data, &cards))
 
+	totalMatches := len(cards)
+	if hv := hdrs.Get("X-Total-Matches"); hv != "" {
+		if n, err := strconv.Atoi(hv); err == nil {
+			totalMatches = n
+		}
+	}
+	queryMode := hdrs.Get("X-Search-Mode")
+	if queryMode == "" {
+		queryMode = "lexical"
+	}
+
 	if jsonMode {
-		printJSON(cards)
+		printJSON(types.SearchResult{
+			Results:      cards,
+			TotalMatches: totalMatches,
+			QueryMode:    queryMode,
+		})
 		return
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "KEY\tPRIORITY\tTITLE\tCOLUMN\tASSIGNEE\tPOINTS")
-	for _, c := range cards {
-		assignee := c.AssigneeName
-		if assignee == "" {
-			assignee = "-"
-		}
-		pts := "-"
-		if c.Points != nil {
-			pts = fmt.Sprintf("%d", *c.Points)
-		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
-			c.Key, c.Priority, Truncate(c.Title, 50), c.ColumnID, assignee, pts)
-	}
-	w.Flush()
-
 	if len(cards) == 0 {
 		fmt.Println("no results")
+		return
 	}
+
+	// Human-readable text mode: one line per result plus an indented snippet.
+	// Keeps a row scannable while surfacing the "why matched" context an
+	// agent (or human skimming) uses to decide whether to drill in.
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "KEY\tCOLUMN\tPRI\tTIER\tKIND\tTITLE")
+	for _, c := range cards {
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+			c.Key, c.ColumnID, shortPriority(c.Priority), scoreTier(c.Score),
+			shortKind(c.MatchKind), Truncate(c.Title, 60))
+	}
+	w.Flush()
+	for _, c := range cards {
+		if c.Snippet == "" {
+			continue
+		}
+		fmt.Printf("  %s ↳ %s\n", c.Key, c.Snippet)
+	}
+
+	if totalMatches > len(cards) {
+		fmt.Printf("\n(%d total — %d shown; refine with --priority, --column_id, or --min_score)\n",
+			totalMatches, len(cards))
+	}
+	if queryMode != "" && queryMode != "lexical" {
+		fmt.Printf("search mode: %s\n", queryMode)
+	}
+}
+
+// scoreTier bundles the raw score into a short label an agent can reason
+// about at a glance: HIGH is confident, MED is worth reading the snippet, LOW
+// means the query was probably too vague.
+func scoreTier(score float64) string {
+	switch {
+	case score >= 0.7:
+		return "HIGH"
+	case score >= 0.55:
+		return "MED"
+	default:
+		return "LOW"
+	}
+}
+
+// shortKind abbreviates match_kind for table output.
+func shortKind(k string) string {
+	switch k {
+	case "title_boundary":
+		return "title"
+	case "semantic":
+		return "sem"
+	case "lexical":
+		return "lex"
+	}
+	return "-"
+}
+
+// shortPriority shortens common priority values so the table stays narrow.
+func shortPriority(p string) string {
+	switch p {
+	case "highest":
+		return "P0"
+	case "high":
+		return "P1"
+	case "medium":
+		return "P2"
+	case "low":
+		return "P3"
+	case "lowest":
+		return "P4"
+	}
+	return p
 }
 
 func CmdSetup() {
