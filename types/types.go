@@ -34,6 +34,20 @@ type Card struct {
 	Position     int     `json:"position"`
 	CreatedAt    string  `json:"created_at"`
 	UpdatedAt    string  `json:"updated_at"`
+
+	// Populated by /api/v1/search only. Zero on other endpoints.
+	Score     float64 `json:"score,omitempty"`
+	MatchKind string  `json:"match_kind,omitempty"`
+	Snippet   string  `json:"snippet,omitempty"`
+}
+
+// SearchResult is the JSON shape the CLI emits in --json mode. Bundles the
+// aggregate metadata (which the server sends in response headers) alongside
+// the results so an agent has a single structured blob to reason about.
+type SearchResult struct {
+	Results      []Card `json:"results"`
+	TotalMatches int    `json:"total_matches"`
+	QueryMode    string `json:"query_mode"`
 }
 
 type Comment struct {

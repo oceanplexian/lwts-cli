@@ -48,35 +48,43 @@ func LoadConfig() (Config, error) {
 }
 
 func (c Config) Request(method, path string, body interface{}) ([]byte, error) {
+	data, _, err := c.RequestWithHeaders(method, path, body)
+	return data, err
+}
+
+// RequestWithHeaders returns the response body and headers. Used for endpoints
+// like /api/v1/search where metadata (X-Search-Mode, X-Total-Matches) travels
+// in headers rather than the JSON body.
+func (c Config) RequestWithHeaders(method, path string, body interface{}) ([]byte, http.Header, error) {
 	var bodyReader io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		bodyReader = bytes.NewReader(b)
 	}
 
 	req, err := http.NewRequest(method, c.APIURL+path, bodyReader)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.APIToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(data))
+		return nil, resp.Header, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(data))
 	}
-	return data, nil
+	return data, resp.Header, nil
 }
