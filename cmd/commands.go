@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/oceanplexian/lwts-cli/client"
@@ -183,6 +184,43 @@ func CmdCard(cfg client.Config, keyOrID string, jsonMode bool) {
 			}
 		}
 	}
+}
+
+// CmdCreateEpic is a thin wrapper around CmdCreate that forces tag=epic and
+// auto-prefixes the title with "EPIC: " if not already present. This exists
+// because creating epics via `create --tag=epic` is easy to forget — the model
+// (and humans) keep filing epics with the default blue/feature tag.
+//
+// Usage: lwts-cli epic <title> [same flags as create, except --tag is ignored]
+func CmdCreateEpic(cfg client.Config, args []string, jsonMode bool) {
+	if len(args) < 1 {
+		Fatal(fmt.Errorf("usage: lwts-cli epic <title> [--board=ID] [--column=todo] [--priority=high] [--desc=TEXT] [--epic=PARENT_UUID]"))
+	}
+	title := args[0]
+	if !strings.HasPrefix(strings.ToUpper(title), "EPIC:") {
+		title = "EPIC: " + title
+	}
+	// Force tag=epic regardless of what the user passed.
+	rest := []string{title}
+	for _, a := range args[1:] {
+		if strings.HasPrefix(a, "--tag=") || strings.HasPrefix(a, "--tag ") {
+			continue
+		}
+		rest = append(rest, a)
+	}
+	rest = append(rest, "--tag=epic")
+	// Default priority to "high" for epics if not explicitly set.
+	hasPri := false
+	for _, a := range args[1:] {
+		if strings.HasPrefix(a, "--priority=") {
+			hasPri = true
+			break
+		}
+	}
+	if !hasPri {
+		rest = append(rest, "--priority=high")
+	}
+	CmdCreate(cfg, rest, jsonMode)
 }
 
 func CmdCreate(cfg client.Config, args []string, jsonMode bool) {

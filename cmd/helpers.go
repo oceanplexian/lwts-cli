@@ -142,6 +142,8 @@ func MapTag(s string) string {
 		return "orange"
 	case "bug", "defect":
 		return "red"
+	case "epic", "initiative", "purple":
+		return "epic"
 	default:
 		return s
 	}

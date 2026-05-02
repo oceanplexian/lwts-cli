@@ -54,7 +54,32 @@ lwts-cli card <KEY>            # Full detail + comments (e.g. KANB-1, LWTS-14)
 lwts-cli create "Title" [flags]
 ```
 
-Flags: `--column=todo` `--tag=blue` `--priority=medium` `--assignee=UUID` `--points=N` `--due=YYYY-MM-DD` `--desc="text"` `--board=ID`
+Flags: `--column=todo` `--tag=blue` `--priority=medium` `--assignee=UUID` `--points=N` `--due=YYYY-MM-DD` `--desc="text"` `--board=ID` `--epic=PARENT_UUID`
+
+### Create an Epic
+
+**Always use the dedicated `epic` subcommand — never `create --tag=blue` for an epic.** Epics are a distinct ticket type (tag=`epic`, rendered purple). Filing an epic with the default blue/feature tag has been a recurring mistake.
+
+```bash
+lwts-cli epic "Testing & QA — regression suites, integration, chaos"
+```
+
+This wrapper:
+- Forces `--tag=epic` (overrides any `--tag` you pass).
+- Auto-prefixes the title with `EPIC: ` if missing.
+- Defaults priority to `high` (override with `--priority=`).
+- Accepts the same flags as `create`, including `--epic=PARENT_UUID` for nested epics.
+
+After creating, capture the new card's UUID (use `--json` and parse `.id`) and pass it as `--epic=<UUID>` when creating or updating child tickets:
+
+```bash
+EPIC_ID=$(lwts-cli epic "Title" --json | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
+lwts-cli update FNAI-184 --epic=$EPIC_ID
+lwts-cli update FNAI-185 --epic=$EPIC_ID
+# ... etc
+```
+
+The `epic_id` field is the ONLY real link between a child and its epic. Mentioning "Parent epic: FNAI-X" in the description is documentation, not a wired relationship.
 
 ### Update
 
@@ -93,11 +118,10 @@ lwts-cli search [flags]
 
 Flags (at least one required):
 - `--q=TEXT` — search title/description
-- `--assignee=NAME` ��� fuzzy match user name
-- `--assignee_id=UUID` — exact user ID
+- `--assignee=NAME` — fuzzy match user name (e.g., `--assignee="Claude"`)
 - `--column_id=COL` — filter by column (backlog, todo, in-progress, done, cleared)
 - `--tag=TAG` — filter by tag
-- `--priority=PRI` ��� filter by priority
+- `--priority=PRI` — filter by priority
 - `--board_id=ID` — filter by board
 - `--limit=N` — max results
 
@@ -105,7 +129,7 @@ Flags (at least one required):
 
 The CLI accepts friendly names and maps them automatically:
 
-**Tags:** feature/feat -> blue, fix/bugfix -> green, infra/ops -> orange, bug/defect -> red
+**Tags:** feature/feat -> blue, fix/bugfix -> green, infra/ops -> orange, bug/defect -> red, epic/initiative/purple -> epic
 
 **Priority:** critical/urgent/p0 -> highest, high/p1 -> high, medium/p2 -> medium, low/p3 -> low, lowest/p4 -> lowest
 
@@ -144,7 +168,7 @@ This prevents multiple agents from grabbing the same ticket and doing duplicate 
 
 ## Behavior Rules
 
-1. **"my tickets"** — run `lwts-cli me` to get user ID, then `lwts-cli search --assignee_id=<id>`
+1. **"my tickets"** — run `lwts-cli me` to get username, then `lwts-cli search --assignee=<username>`
 2. **"what's X working on"** — `lwts-cli search --assignee=<name>`
 3. **Creating cards** — default to column=todo, tag=blue, priority=medium. Ask for title at minimum. If the card relates to code or a repo, include `**Repo:** <github URL>` as the first line of the description.
 4. **Ambiguity** — if unclear which card, ask. If obvious from context, proceed.
@@ -154,7 +178,7 @@ This prevents multiple agents from grabbing the same ticket and doing duplicate 
 ## Example Interactions
 
 **"what are my tickets?"**
--> `lwts-cli me` -> get ID -> `lwts-cli search --assignee_id=<id>`
+-> `lwts-cli me` -> get username -> `lwts-cli search --assignee=<username>`
 
 **"show me all bugs"**
 -> `lwts-cli search --tag=red`

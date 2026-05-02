@@ -63,6 +63,8 @@ func main() {
 		cmd.CmdCard(cfg, os.Args[2], jsonMode)
 	case "create":
 		cmd.CmdCreate(cfg, os.Args[2:], jsonMode)
+	case "epic":
+		cmd.CmdCreateEpic(cfg, os.Args[2:], jsonMode)
 	case "update":
 		if len(os.Args) < 3 {
 			cmd.Fatal(fmt.Errorf("usage: lwts-cli update <key> --field=value ..."))
@@ -111,6 +113,7 @@ Commands:
   cards [board_id]               List cards (auto-selects if one board)
   card <key>                     Show card detail + comments
   create <title> [flags]         Create a card
+  epic <title> [flags]           Create an epic (forces tag=epic, prefixes "EPIC: ")
   update <key> [flags]           Update a card
   move <key> <column>            Move card to column
   delete <key>                   Delete a card
@@ -124,7 +127,7 @@ Global flags:
 Create/Update flags:
   --board=ID        Board ID
   --column=COL      Column (backlog, todo, in-progress, done, cleared)
-  --tag=TAG         Tag (blue/feature, green/fix, orange/infra, red/bug)
+  --tag=TAG         Tag (blue/feature, green/fix, orange/infra, red/bug, epic/initiative)
   --priority=PRI    Priority (highest/critical, high, medium, low, lowest)
   --assignee=UUID   Assignee user ID
   --points=N        Story points
