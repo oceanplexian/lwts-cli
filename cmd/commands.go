@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/oceanplexian/lwts-cli/client"
 	"github.com/oceanplexian/lwts-cli/types"
@@ -425,16 +426,53 @@ func CmdSearch(cfg client.Config, args []string, jsonMode bool) {
 		params.Set("include_done", "false")
 	}
 
+	// --updated-since / --closed-since: client-side filter on Card.UpdatedAt.
+	// Accepts YYYY-MM-DD or relative like "3d", "72h". For "closed in last N
+	// days," combine with --column_id=done --include-done=true.
+	sinceRaw := flags["updated-since"]
+	if sinceRaw == "" {
+		sinceRaw = flags["updated_since"]
+	}
+	if sinceRaw == "" {
+		sinceRaw = flags["closed-since"]
+	}
+	if sinceRaw == "" {
+		sinceRaw = flags["closed_since"]
+	}
+	var sinceTime time.Time
+	if sinceRaw != "" {
+		t, err := parseSince(sinceRaw)
+		Fatal(err)
+		sinceTime = t
+	}
+
 	if params.Get("q") == "" && params.Get("assignee") == "" && params.Get("assignee_id") == "" &&
 		params.Get("column_id") == "" && params.Get("tag") == "" && params.Get("priority") == "" &&
-		params.Get("board_id") == "" {
-		Fatal(fmt.Errorf("search requires at least one filter: --q, --assignee, --column_id, --tag, --priority, --board_id"))
+		params.Get("board_id") == "" && sinceRaw == "" {
+		Fatal(fmt.Errorf("search requires at least one filter: --q, --assignee, --column_id, --tag, --priority, --board_id, --updated-since"))
 	}
 
 	data, hdrs, err := cfg.RequestWithHeaders("GET", "/api/v1/search?"+params.Encode(), nil)
 	Fatal(err)
 	var cards []types.Card
 	Fatal(json.Unmarshal(data, &cards))
+
+	if !sinceTime.IsZero() {
+		filtered := cards[:0]
+		for _, c := range cards {
+			ts, err := time.Parse(time.RFC3339Nano, c.UpdatedAt)
+			if err != nil {
+				ts, err = time.Parse(time.RFC3339, c.UpdatedAt)
+				if err != nil {
+					continue
+				}
+			}
+			if !ts.Before(sinceTime) {
+				filtered = append(filtered, c)
+			}
+		}
+		cards = filtered
+	}
 
 	totalMatches := len(cards)
 	if hv := hdrs.Get("X-Total-Matches"); hv != "" {
@@ -486,6 +524,28 @@ func CmdSearch(cfg client.Config, args []string, jsonMode bool) {
 	if queryMode != "" && queryMode != "lexical" {
 		fmt.Printf("search mode: %s\n", queryMode)
 	}
+}
+
+// parseSince accepts YYYY-MM-DD or a relative duration like "3d" / "72h" /
+// "30m" and returns the absolute cutoff time. Days are expanded to hours
+// since time.ParseDuration doesn't know "d".
+func parseSince(s string) (time.Time, error) {
+	s = strings.TrimSpace(s)
+	if t, err := time.Parse("2006-01-02", s); err == nil {
+		return t, nil
+	}
+	if strings.HasSuffix(s, "d") {
+		n, err := strconv.Atoi(strings.TrimSuffix(s, "d"))
+		if err != nil {
+			return time.Time{}, fmt.Errorf("invalid days in --updated-since=%q", s)
+		}
+		return time.Now().Add(-time.Duration(n) * 24 * time.Hour), nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid --updated-since=%q (want YYYY-MM-DD or e.g. 3d, 72h)", s)
+	}
+	return time.Now().Add(-d), nil
 }
 
 // scoreTier bundles the raw score into a short label an agent can reason
