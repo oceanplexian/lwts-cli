@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -493,6 +494,13 @@ func CmdSearch(cfg client.Config, args []string, jsonMode bool) {
 		}
 	}
 
+	// Sort newest-first by updated_at so retro-style output ("what was done
+	// last week") reads top-down. Stable so equal timestamps keep the
+	// server's score-based order.
+	sort.SliceStable(cards, func(i, j int) bool {
+		return cards[i].UpdatedAt > cards[j].UpdatedAt
+	})
+
 	totalMatches := len(cards)
 	if hv := hdrs.Get("X-Total-Matches"); hv != "" {
 		if n, err := strconv.Atoi(hv); err == nil {
@@ -522,11 +530,11 @@ func CmdSearch(cfg client.Config, args []string, jsonMode bool) {
 	// Keeps a row scannable while surfacing the "why matched" context an
 	// agent (or human skimming) uses to decide whether to drill in.
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "KEY\tCOLUMN\tPRI\tTIER\tKIND\tTITLE")
+	fmt.Fprintln(w, "KEY\tUPDATED\tCOLUMN\tPRI\tTIER\tKIND\tTITLE")
 	for _, c := range cards {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
-			c.Key, c.ColumnID, shortPriority(c.Priority), scoreTier(c.Score),
-			shortKind(c.MatchKind), Truncate(c.Title, 60))
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			c.Key, shortDate(c.UpdatedAt), c.ColumnID, shortPriority(c.Priority),
+			scoreTier(c.Score), shortKind(c.MatchKind), Truncate(c.Title, 60))
 	}
 	w.Flush()
 	for _, c := range cards {
@@ -540,7 +548,7 @@ func CmdSearch(cfg client.Config, args []string, jsonMode bool) {
 			if c.Blurb == "" {
 				continue
 			}
-			fmt.Printf("\n%s — %s\n%s\n", c.Key, c.Title, c.Blurb)
+			fmt.Printf("\n%s (%s) — %s\n%s\n", c.Key, shortDate(c.UpdatedAt), c.Title, c.Blurb)
 		}
 	}
 
@@ -587,6 +595,18 @@ func truncateWords(s string, n int) string {
 		return strings.Join(words, " ")
 	}
 	return strings.Join(words[:n], " ") + " …"
+}
+
+// shortDate returns the YYYY-MM-DD prefix of an RFC3339 timestamp. Returns
+// "-" for empty input so the column always has something to align against.
+func shortDate(s string) string {
+	if len(s) >= 10 {
+		return s[:10]
+	}
+	if s == "" {
+		return "-"
+	}
+	return s
 }
 
 // scoreTier bundles the raw score into a short label an agent can reason
