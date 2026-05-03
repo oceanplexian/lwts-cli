@@ -39,6 +39,11 @@ type Card struct {
 	Score     float64 `json:"score,omitempty"`
 	MatchKind string  `json:"match_kind,omitempty"`
 	Snippet   string  `json:"snippet,omitempty"`
+
+	// Populated by `search --blurb=N`: first N words of Description.
+	// Lets an agent get a richer summary than the match snippet without
+	// fetching each card individually.
+	Blurb string `json:"blurb,omitempty"`
 }
 
 // SearchResult is the JSON shape the CLI emits in --json mode. Bundles the

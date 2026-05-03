@@ -457,6 +457,19 @@ func CmdSearch(cfg client.Config, args []string, jsonMode bool) {
 	var cards []types.Card
 	Fatal(json.Unmarshal(data, &cards))
 
+	// --blurb=N: include first N words of each card's description. Bare
+	// "--blurb=true" uses the default cap (500 words). Set to 0 to disable.
+	blurbWords := 0
+	if v := flags["blurb"]; v != "" {
+		if v == "true" {
+			blurbWords = 500
+		} else if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			blurbWords = n
+		} else {
+			Fatal(fmt.Errorf("invalid --blurb=%q (want positive integer or 'true')", v))
+		}
+	}
+
 	if !sinceTime.IsZero() {
 		filtered := cards[:0]
 		for _, c := range cards {
@@ -472,6 +485,12 @@ func CmdSearch(cfg client.Config, args []string, jsonMode bool) {
 			}
 		}
 		cards = filtered
+	}
+
+	if blurbWords > 0 {
+		for i := range cards {
+			cards[i].Blurb = truncateWords(cards[i].Description, blurbWords)
+		}
 	}
 
 	totalMatches := len(cards)
@@ -516,6 +535,14 @@ func CmdSearch(cfg client.Config, args []string, jsonMode bool) {
 		}
 		fmt.Printf("  %s ↳ %s\n", c.Key, c.Snippet)
 	}
+	if blurbWords > 0 {
+		for _, c := range cards {
+			if c.Blurb == "" {
+				continue
+			}
+			fmt.Printf("\n%s — %s\n%s\n", c.Key, c.Title, c.Blurb)
+		}
+	}
 
 	if totalMatches > len(cards) {
 		fmt.Printf("\n(%d total — %d shown; refine with --priority, --column_id, or --min_score)\n",
@@ -546,6 +573,20 @@ func parseSince(s string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("invalid --updated-since=%q (want YYYY-MM-DD or e.g. 3d, 72h)", s)
 	}
 	return time.Now().Add(-d), nil
+}
+
+// truncateWords returns the first n whitespace-separated words of s. If s
+// has more than n words, an ellipsis is appended so the caller can tell the
+// blurb was cut. Returns s unchanged when it fits.
+func truncateWords(s string, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	words := strings.Fields(s)
+	if len(words) <= n {
+		return strings.Join(words, " ")
+	}
+	return strings.Join(words[:n], " ") + " …"
 }
 
 // scoreTier bundles the raw score into a short label an agent can reason

@@ -150,6 +150,9 @@ Search flags:
   --updated-since=X    Only cards updated on/after X (YYYY-MM-DD or relative
                        like 3d, 72h). For "closed in last 3 days":
                        --column_id=done --include-done=true --updated-since=3d
+  --blurb=N            Include first N words of each card's description in
+                       output (--blurb=true uses default 500). Pairs with
+                       --json for "what was done last week" agent prompts.
 
 Each result prints an indented snippet explaining why it matched, plus a
 confidence tier (HIGH/MED/LOW) and match kind (title/sem/lex). Use --json
