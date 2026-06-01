@@ -110,6 +110,46 @@ lwts-cli comment <KEY> "comment body"   # Add comment
 lwts-cli comments <KEY>                 # List comments
 ```
 
+### Images (attach & retrieve)
+
+Images are a property of a card/ticket. `lwts-cli` has no image subcommand, so
+use `curl` against the API directly. Read `api_url` and `api_token` from
+`~/.config/lwts/config.yaml`; the card **KEY** (e.g. `FNAI-245`) works in the
+path just like a UUID.
+
+```bash
+# Read API base + token once
+BASE=$(grep api_url   ~/.config/lwts/config.yaml | awk '{print $2}')
+TOKEN=$(grep api_token ~/.config/lwts/config.yaml | awk '{print $2}')
+AUTH="Authorization: Bearer $TOKEN"
+
+# Attach an image (multipart; field name is `file`). Returns the image metadata.
+curl -s -H "$AUTH" -F "file=@/path/to/screenshot.png" \
+  "$BASE/api/v1/cards/FNAI-245/images"
+
+# Attach via raw body instead of multipart (set the content type yourself):
+curl -s -H "$AUTH" -H "Content-Type: image/png" --data-binary @shot.png \
+  "$BASE/api/v1/cards/FNAI-245/images?filename=shot.png"
+
+# List images on a card (metadata only — id, filename, content_type, size, url):
+curl -s -H "$AUTH" "$BASE/api/v1/cards/FNAI-245/images"
+
+# Download the raw bytes of one image (id or `url` field from the list above):
+curl -s -H "$AUTH" "$BASE/api/v1/cards/FNAI-245/images/<IMAGE_ID>" -o out.png
+
+# Delete an image:
+curl -s -X DELETE -H "$AUTH" "$BASE/api/v1/cards/FNAI-245/images/<IMAGE_ID>"
+```
+
+Notes:
+- Only image uploads are accepted (PNG/JPEG/GIF/WebP/SVG…); non-images return
+  `415`. Empty body → `400`, unknown card → `404`. Max size is the server's
+  `MAX_UPLOAD_SIZE` (10 MiB by default).
+- `lwts-cli card <KEY>` / the card-detail API also returns an `images` array, so
+  attached images show up alongside comments.
+- Images attach to the **ticket**, not to a specific comment. Referencing an
+  image inline within a comment isn't supported yet.
+
 ### Search
 
 ```bash
