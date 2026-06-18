@@ -375,11 +375,44 @@ func CmdComments(cfg client.Config, keyOrID string, jsonMode bool) {
 		if name, ok := userMap[cm.AuthorID]; ok {
 			author = name
 		}
-		fmt.Printf("[%s] %s: %s\n", cm.CreatedAt, author, cm.Body)
+		// Show the comment ID so it can be passed to `delete-comment` /
+		// `update-comment`. Flatten the body to one scannable line — use
+		// `comments <key> --json` or `card <key>` for the full body.
+		fmt.Printf("[%s] %s  %s: %s\n", cm.CreatedAt, cm.ID, author, flattenBody(cm.Body))
 	}
 	if len(comments) == 0 {
 		fmt.Println("no comments")
 	}
+}
+
+// CmdDeleteComment deletes a comment by ID (author or admin only, enforced
+// server-side). Get the ID from `comments <key>`.
+func CmdDeleteComment(cfg client.Config, commentID string, jsonMode bool) {
+	_, err := cfg.Request("DELETE", "/api/v1/comments/"+commentID, nil)
+	Fatal(err)
+	if jsonMode {
+		printJSON(map[string]string{"status": "deleted", "id": commentID})
+		return
+	}
+	fmt.Printf("deleted comment %s\n", commentID)
+}
+
+// CmdUpdateComment rewrites a comment's body by ID (author or admin only).
+func CmdUpdateComment(cfg client.Config, commentID, body string, jsonMode bool) {
+	payload := map[string]string{"body": body}
+	_, err := cfg.Request("PUT", "/api/v1/comments/"+commentID, payload)
+	Fatal(err)
+	if jsonMode {
+		printJSON(map[string]string{"status": "updated", "id": commentID})
+		return
+	}
+	fmt.Printf("updated comment %s\n", commentID)
+}
+
+// flattenBody collapses a (possibly multi-line, multi-paragraph) comment body
+// to a single scannable line for the `comments <key>` list view.
+func flattenBody(s string) string {
+	return Truncate(strings.Join(strings.Fields(strings.TrimSpace(s)), " "), 160)
 }
 
 // CmdSearch queries /api/v1/search with agent-friendly defaults:

@@ -106,9 +106,13 @@ lwts-cli delete <KEY>
 ### Comments
 
 ```bash
-lwts-cli comment <KEY> "comment body"   # Add comment
-lwts-cli comments <KEY>                 # List comments
+lwts-cli comment <KEY> "comment body"          # Add comment
+lwts-cli comments <KEY>                        # List comments (prints each comment ID)
+lwts-cli delete-comment <comment-id>           # Delete a comment by ID (author or admin)
+lwts-cli update-comment <comment-id> "body"    # Rewrite a comment's body by ID
 ```
+
+`comments <KEY>` prints each comment's ID alongside a one-line flattened preview of the body. Use that ID with `delete-comment` / `update-comment` to clean up noise (e.g. redundant re-analysis left by an earlier agent). For the full multi-paragraph body, use `comments <KEY> --json` or `card <KEY>`. Delete/update are author-or-admin only and enforced server-side.
 
 ### Images (attach & retrieve)
 

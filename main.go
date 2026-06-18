@@ -90,6 +90,16 @@ func main() {
 			cmd.Fatal(fmt.Errorf("usage: lwts-cli comments <key>"))
 		}
 		cmd.CmdComments(cfg, os.Args[2], jsonMode)
+	case "delete-comment":
+		if len(os.Args) < 3 {
+			cmd.Fatal(fmt.Errorf("usage: lwts-cli delete-comment <comment-id>"))
+		}
+		cmd.CmdDeleteComment(cfg, os.Args[2], jsonMode)
+	case "update-comment":
+		if len(os.Args) < 4 {
+			cmd.Fatal(fmt.Errorf("usage: lwts-cli update-comment <comment-id> <body>"))
+		}
+		cmd.CmdUpdateComment(cfg, os.Args[2], strings.Join(os.Args[3:], " "), jsonMode)
 	case "search":
 		cmd.CmdSearch(cfg, os.Args[2:], jsonMode)
 	default:
@@ -118,7 +128,9 @@ Commands:
   move <key> <column>            Move card to column
   delete <key>                   Delete a card
   comment <key> <body>           Add a comment
-  comments <key>                 List comments
+  comments <key>                 List comments (with comment IDs)
+  delete-comment <id>            Delete a comment by ID
+  update-comment <id> <body>     Update a comment's body by ID
   search [flags]                 Search cards
 
 Global flags:

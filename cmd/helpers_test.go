@@ -25,7 +25,8 @@ func TestMapTag(t *testing.T) {
 		{"green", "green"},
 		{"orange", "orange"},
 		{"red", "red"},
-		{"purple", "purple"},
+		{"purple", "epic"}, // purple is an alias for the epic tag, not a passthrough
+		{"epic", "epic"},
 		{"", ""},
 	}
 
